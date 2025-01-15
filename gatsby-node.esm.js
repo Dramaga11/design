@@ -195,13 +195,23 @@ async function sourcePrimerRailsData({actions, createNodeId, createContentDigest
 
   actions.createNode(newNode)
 
+  let infoArch
+
   // Save the PVC data to the GraphQL store
-  const url = `https://api.github.com/repos/primer/view_components/contents/static/info_arch.json?ref=v${version}`
-  const argsJson = await fetch(url).then(res => res.json())
+  if (process.env.RAILS_INFO_ARCH_PATH) {
+    const path = process.env.RAILS_INFO_ARCH_PATH
+    console.log(`Using Rails information architecture data from ${path}`)
+    const fileContent = fs.readFileSync(path, {encoding: 'utf-8'})
+    infoArch = JSON.parse(fileContent)
+  } else {
+    console.log(`Fetching Rails information architecture data for version ${version}`)
+    const url = `https://api.github.com/repos/primer/view_components/contents/static/info_arch.json?ref=v${version}`
+    const response = await fetch(url).then(res => res.json())
 
-  const argsContent = JSON.parse(Buffer.from(argsJson.content, 'base64').toString())
+    infoArch = JSON.parse(Buffer.from(response.content, 'base64').toString())
+  }
 
-  for (const component of argsContent) {
+  for (const component of infoArch) {
     const newNode = {
       ...component,
       id: createNodeId(`rails-${component.status}-${component.component}`),
@@ -245,7 +255,7 @@ async function sourcePrimerReactData({actions, createNodeId, createContentDigest
 
   for (const component of Object.values(content.components)) {
     const newNode = {
-      ...{...component, componentId: component.id},
+      ...{...component, componentId: component.docsId || component.id},
       id: createNodeId(`react-${component.id}`),
       internal: {
         type: 'ReactComponent',
@@ -450,6 +460,7 @@ async function createComponentPages({actions, graphql}) {
       allReactComponent {
         nodes {
           reactId: componentId
+          docsId
           status
         }
       }
